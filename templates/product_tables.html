@@ -1,0 +1,23 @@
+<!-- templates/product_tables.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Product of Two Tables</h2>
+{% if error %}
+    <p style="color:red;">Error: {{ error }}</p>
+{% endif %}
+<form action="/product_tables" method="post">
+    <label for="table1_name">First Table:</label><br>
+    <select name="table1_name" id="table1_name" required>
+        {% for table_name in tables %}
+            <option value="{{ table_name }}">{{ table_name }}</option>
+        {% endfor %}
+    </select><br><br>
+    <label for="table2_name">Second Table:</label><br>
+    <select name="table2_name" id="table2_name" required>
+        {% for table_name in tables %}
+            <option value="{{ table_name }}">{{ table_name }}</option>
+        {% endfor %}
+    </select><br><br>
+    <button type="submit">Perform Product</button>
+</form>
+{% endblock %}

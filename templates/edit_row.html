@@ -1,0 +1,15 @@
+<!-- templates/edit_row.html -->
+{% extends "base.html" %}
+{% block content %}
+{% if error %}
+    <p style="color:red;">Error: {{ error }}</p>
+{% endif %}
+<h2>Edit Row in {{ table.name }}</h2>
+<form action="/tables/{{ table.name }}/edit_row/{{ row_index }}" method="post">
+    {% for attr in table.schema.attributes %}
+        <label for="{{ attr.name }}">{{ attr.name }} ({{ attr.data_type }}):</label><br>
+        <input type="text" id="{{ attr.name }}" name="{{ attr.name }}" value="{{ row.data.get(attr.name, '') }}" required><br><br>
+    {% endfor %}
+    <button type="submit">Update Row</button>
+</form>
+{% endblock %}

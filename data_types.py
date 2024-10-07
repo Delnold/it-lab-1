@@ -1,10 +1,14 @@
 # data_types.py
-
 import datetime
+
+SUPPORTED_DATA_TYPES = {'integer', 'real', 'char', 'string', 'date', 'date_interval'}
+
+# data_types.py
+
 
 def parse_data(value, data_type):
     if value is None or value == '':
-        raise ValueError("Value cannot be empty.")
+        raise ValueError(f"Value cannot be empty. Expected {data_type}.")
     try:
         if data_type == 'integer':
             return int(value)
@@ -28,8 +32,9 @@ def parse_data(value, data_type):
             return (start_date, end_date)
         else:
             raise ValueError(f"Unknown data type: {data_type}")
-    except Exception as e:
+    except ValueError as e:
         raise ValueError(f"Error parsing value '{value}' as {data_type}: {e}")
+
 
 def validate_data(value, data_type):
     try:

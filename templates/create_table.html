@@ -1,11 +1,10 @@
-<!-- templates/create_table.html -->
 {% extends "base.html" %}
 {% block content %}
-<h2>Create a New Table</h2>
+<h2>Create a New Table in Database '{{ db_name }}'</h2>
 {% if error %}
     <p style="color:red;">Error: {{ error }}</p>
 {% endif %}
-<form action="/create_table" method="post">
+<form action="/databases/{{ db_name }}/create_table" method="post">
     <label for="table_name">Table Name:</label><br>
     <input type="text" id="table_name" name="table_name" required><br><br>
     <label for="attributes">Attributes (format: name:type, separated by commas):</label><br>

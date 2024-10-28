@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
@@ -59,7 +59,6 @@ def export_table(db_name: str, table_name: str):
     # Return the file as a response
     return FileResponse(path=file_path, filename=f"{table_name}.xlsx",
                         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
 
 @app.get("/")
 def read_root(request: Request):
@@ -436,4 +435,121 @@ def delete_row(request: Request, db_name: str, table_name: str, row_index: int):
         table.delete_row(row_index)
     except IndexError:
         pass  # Ignore if row doesn't exist
+    return RedirectResponse(f"/databases/{db_name}/tables/{table_name}", status_code=303)
+
+
+@app.get("/databases/{db_name}/tables/{table_name}/import_excel")
+def get_import_excel_form(request: Request, db_name: str, table_name: str):
+    """
+    Renders the import Excel form.
+    """
+    db = databases.get(db_name)
+    if not db:
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error": f"Database '{db_name}' not found."
+        })
+    table = db.get_table(table_name)
+    if not table:
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error": f"Table '{table_name}' not found in database '{db_name}'."
+        })
+    return templates.TemplateResponse("import_excel.html", {
+        "request": request,
+        "db_name": db_name,
+        "table_name": table_name
+    })
+
+
+@app.post("/databases/{db_name}/tables/{table_name}/import_excel")
+async def post_import_excel(request: Request, db_name: str, table_name: str, file: UploadFile = File(...)):
+    """
+    Handles the import of data from an Excel file into the specified table.
+    """
+    db = databases.get(db_name)
+    if not db:
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "error": f"Database '{db_name}' not found.",
+            "db_name": db_name,
+            "table_name": table_name
+        })
+
+    table = db.get_table(table_name)
+    if not table:
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "error": f"Table '{table_name}' not found in database '{db_name}'.",
+            "db_name": db_name,
+            "table_name": table_name
+        })
+
+    # Validate file type
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "error": "Invalid file type. Only Excel files (.xlsx, .xls) are supported.",
+            "db_name": db_name,
+            "table_name": table_name
+        })
+
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "error": f"Error reading Excel file: {e}",
+            "db_name": db_name,
+            "table_name": table_name
+        })
+
+    # Validate columns
+    expected_columns = [attr.name for attr in table.schema.attributes]
+    excel_columns = list(df.columns)
+
+    if excel_columns != expected_columns:
+        error_msg = f"Excel columns do not match table schema.<br>Expected: {expected_columns}<br>Found: {excel_columns}"
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "error": error_msg,
+            "db_name": db_name,
+            "table_name": table_name
+        })
+
+    # Insert rows
+    inserted_rows = 0
+    errors = []
+
+    for index, row in df.iterrows():
+        parsed_data = {}
+        for attr in table.schema.attributes:
+            value = row[attr.name]
+            try:
+                # Handle NaN as empty string
+                if pd.isna(value):
+                    value = ''
+                else:
+                    value = str(value)
+                parsed_value = parse_data(value, attr.data_type)
+                parsed_data[attr.name] = parsed_value
+            except ValueError as ve:
+                errors.append(f"Row {index + 1}: {ve}")
+                break  # Skip to next row if there's an error
+        else:
+            # Only insert row if no errors
+            new_row = Row(parsed_data)
+            table.insert_row(new_row)
+            inserted_rows += 1
+
+    if errors:
+        return templates.TemplateResponse("import_excel.html", {
+            "request": request,
+            "db_name": db_name,
+            "table_name": table_name,
+            "errors": errors,
+            "inserted_rows": inserted_rows
+        })
+
     return RedirectResponse(f"/databases/{db_name}/tables/{table_name}", status_code=303)
